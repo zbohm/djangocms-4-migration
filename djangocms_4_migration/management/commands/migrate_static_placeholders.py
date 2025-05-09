@@ -134,7 +134,7 @@ def _create_alias_content(alias, name, language, user, state=PUBLISHED):
     except Exception:
         version = Version.objects.all().last()
         logger.error(f"Use LATEST version: {version} with content_type_id {version.content_type_id}"
-                     f" and object_id {version.object_id}.")
+                     f" and object_id {version.object_id} for state {state}.")
 
     logger.info(f'Created AliasContent {alias_content} and version {version}')
     return alias_content
