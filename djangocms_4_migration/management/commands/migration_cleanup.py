@@ -19,6 +19,14 @@ from djangocms_versioning.models import Version
 logger = logging.getLogger(__name__)
 
 
+def get_replacement_page(page):
+    try:
+        return Page.objects.filter(node__id=page.node.id).exclude(id=page.id).get()
+    except Page.DoesNotExist as error:
+        logger.info(f"{error} page.node.id: {page.node.id}, page.id: {page.id}")
+    return None
+
+
 def _fix_link_plugins(page):
     """djangocms-link with version above 5.0.0 stores only "soft" references to pages in JSON fields which will not be
     updated by `_fix_page_refernces`"""
@@ -31,10 +39,10 @@ def _fix_link_plugins(page):
                 if "internal_link" in link.link and link.link["internal_link"].startswith("cms.page:"):
                     _, linked_page_id = link.link["internal_link"].split(":")
                     if linked_page_id == str(page.pk):
-                        replacement_page = Page.objects.filter(node_id=page.node_id).exclude(id=page.id).get()
-                        logger.info("Fixing link reference from Page %s to %s", page.id, replacement_page.id)
-                        link.link["internal_link"] = f"cms.page:{replacement_page.pk}"
-                        link.save()
+                        if replacement_page := get_replacement_page(page):
+                            logger.info("Fixing link reference from Page %s to %s", page.id, replacement_page.id)
+                            link.link["internal_link"] = f"cms.page:{replacement_page.pk}"
+                            link.save()
 
 def _fix_frontend_refernces(page):
     """djangocms-frontend stores only "soft" references to pages in JSON fields which will not be
@@ -46,15 +54,16 @@ def _fix_frontend_refernces(page):
                 # Update link field
                 _, linked_page_id = value.split(":")
                 if linked_page_id == str(pk):
-                    replacement_page = Page.objects.filter(node_id=page.node_id).exclude(id=page.id).get()
-                    json[key] = f"{reference}:{replacement_page.pk}"
-                    changed = True
+                    if replacement_page := get_replacement_page(page):
+                        json[key] = f"{reference}:{replacement_page.pk}"
+                        changed = True
             elif isinstance(value, dict) and "model" in value and value["model"] == reference and "pk" in value:
                 # Update reference
                 if value["pk"] == pk:
-                    replacement_page = Page.objects.filter(node_id=page.node_id).exclude(id=page.id).get()
-                    value["pk"] = replacement_page.pk
-                    changed = True
+                    replacement_page = get_replacement_page(page)
+                    if replacement_page:
+                        value["pk"] = replacement_page.pk
+                        changed = True
             elif isinstance(value, dict):
                 # search recursively
                 changed = changed or search(value, reference, pk)
@@ -77,7 +86,8 @@ def _fix_page_references(page):
         and not f.concrete
     ]
 
-    replacement_page = Page.objects.filter(node_id=page.node_id).exclude(id=page.id).get()
+    if replacement_page := get_replacement_page(page) is None:
+        return
     logger.info("Fixing reference from Page %s to %s", page.id, replacement_page.id)
 
     for rel in relations:
