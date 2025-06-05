@@ -223,7 +223,7 @@ def _process_sites(plugin_id_list):
 
         sites_placeholders = [
             placeholders.pk
-            for pagecontent in PageContent._base_manager.filter(page__site_id=site.id)
+            for pagecontent in PageContent._base_manager.filter(page__node__site_id=site.id)
             for placeholders in pagecontent.get_placeholders()
         ]
         for language in get_language_list(site.id):

@@ -23,7 +23,7 @@ def get_replacement_page(page):
     try:
         return Page.objects.filter(node__id=page.node.id).exclude(id=page.id).get()
     except Page.DoesNotExist as error:
-        logger.info(f"{error} page.node.id: {page.node.id}, page.id: {page.id}")
+        logger.warning(f"{error} page.node.id: {page.node.id}, page.id: {page.id}")
     return None
 
 
@@ -60,8 +60,7 @@ def _fix_frontend_refernces(page):
             elif isinstance(value, dict) and "model" in value and value["model"] == reference and "pk" in value:
                 # Update reference
                 if value["pk"] == pk:
-                    replacement_page = get_replacement_page(page)
-                    if replacement_page:
+                    if replacement_page := get_replacement_page(page):
                         value["pk"] = replacement_page.pk
                         changed = True
             elif isinstance(value, dict):
@@ -86,7 +85,8 @@ def _fix_page_references(page):
         and not f.concrete
     ]
 
-    if replacement_page := get_replacement_page(page) is None:
+    replacement_page = get_replacement_page(page)
+    if replacement_page is None:
         return
     logger.info("Fixing reference from Page %s to %s", page.id, replacement_page.id)
 
