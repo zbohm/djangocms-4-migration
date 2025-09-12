@@ -22,3 +22,5 @@ class Command(BaseCommand):
         # Clean up after the migration has finished
         call_command('migration_cleanup')
         call_command('remove_unlinked_placeholders')
+
+        call_command('fix_page_url')
